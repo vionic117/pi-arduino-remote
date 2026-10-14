@@ -1,0 +1,26 @@
+# Python
+venv/
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Backups and logs
+*.backup
+*.log
+
+# Editor files
+.vscode/
+.idea/
+
+# Arduino build output
+build/
+*.hex
+*.elf
