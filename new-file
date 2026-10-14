@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Raspberry Pi Remote</title>
+<style>
+:root {color-scheme:dark;font-family:Arial,sans-serif}
+body {background:#111;color:#fff;margin:0;padding:20px}
+.container {max-width:700px;margin:auto}
+h1 {margin-bottom:5px}
+.online,.connected {color:#4caf50;font-weight:bold}
+.disconnected {color:#f44336;font-weight:bold}
+.card {background:#222;border-radius:12px;padding:20px;margin-top:20px}
+.row {display:flex;justify-content:space-between;gap:15px;padding:12px 0;border-bottom:1px solid #444}
+.row:last-child {border-bottom:none}
+.value {font-weight:bold;text-align:right;overflow-wrap:anywhere}
+.refresh {color:#aaa;font-size:13px;margin-top:15px}
+.controls {display:flex;flex-wrap:wrap;gap:10px;margin-top:18px}
+button {background:#345d91;color:#fff;border:0;border-radius:9px;padding:13px 18px;font-size:15px;cursor:pointer;flex:1;min-width:105px}
+button:disabled {opacity:.45;cursor:not-allowed}
+button.on {background:#276b41}button.off {background:#923c3c}
+#command-result {min-height:20px;color:#ddd;overflow-wrap:anywhere}
+</style>
+</head>
+<body><div class="container">
+<h1>Raspberry Pi Remote</h1>
+<div class="online">● ONLINE</div>
+<div class="card"><h2>System Status</h2>
+<div class="row"><span>CPU Temperature</span><span class="value" id="temperature">Loading...</span></div>
+<div class="row"><span>CPU Load (1 min)</span><span class="value" id="cpu">Loading...</span></div>
+<div class="row"><span>Memory</span><span class="value" id="memory">Loading...</span></div>
+<div class="row"><span>Disk</span><span class="value" id="disk">Loading...</span></div>
+<div class="row"><span>Uptime</span><span class="value" id="uptime">Loading...</span></div>
+<div class="row"><span>IP Address</span><span class="value" id="ip">Loading...</span></div>
+<div class="refresh">System readings update every 3 seconds. CPU load is not instantaneous utilization.</div>
+</div>
+<div class="card"><h2>Arduino Uno</h2>
+<div class="row"><span>Status</span><span id="arduino-status" class="disconnected">Checking...</span></div>
+<div class="row"><span>Port</span><span class="value" id="arduino-port">Checking...</span></div>
+<div class="controls">
+<button class="on" data-action="on" disabled>LED ON</button>
+<button class="off" data-action="off" disabled>LED OFF</button>
+<button data-action="blink" disabled>LED BLINK</button>
+<button data-action="status" disabled>CHECK STATUS</button>
+</div>
+<p id="command-result" role="status" aria-live="polite"></p>
+</div></div>
+<script>
+let busy=false;
+const buttons=[...document.querySelectorAll('[data-action]')];
+function setButtons(connected){buttons.forEach(b=>b.disabled=busy||!connected)}
+async function updateStatus(){
+ try{
+  const response=await fetch('/api/status',{cache:'no-store'});
+  if(!response.ok)throw new Error('Status request failed');
+  const data=await response.json();
+  for(const key of ['temperature','cpu','memory','disk','uptime','ip'])
+   document.getElementById(key).textContent=data[key];
+  const status=document.getElementById('arduino-status');
+  status.textContent=data.arduino_connected?'● PORT DETECTED':'● DISCONNECTED';
+  status.className=data.arduino_connected?'connected':'disconnected';
+  document.getElementById('arduino-port').textContent=data.arduino_port;
+  setButtons(data.arduino_connected);
+ }catch(err){
+  document.getElementById('arduino-status').textContent='● STATUS UNAVAILABLE';
+  document.getElementById('arduino-status').className='disconnected';
+  setButtons(false);
+ }
+}
+async function control(action){
+ busy=true;setButtons(false);
+ const output=document.getElementById('command-result');
+ output.textContent='Sending command...';
+ try{
+  const response=await fetch('/api/arduino/'+action,{method:'POST'});
+  const data=await response.json();
+  if(!response.ok)throw new Error(data.detail||'Command failed');
+  output.textContent=data.reply;
+ }catch(err){output.textContent='Error: '+err.message}
+ finally{busy=false;await updateStatus()}
+}
+buttons.forEach(b=>b.addEventListener('click',()=>control(b.dataset.action)));
+updateStatus();setInterval(updateStatus,3000);
+</script></body></html>'''
